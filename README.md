@@ -1,36 +1,167 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GraspIQ LMS MVP Plan
 
-## Getting Started
+This README captures the extracted MVP plan and product description for a live-learning LMS with role-based access.
 
-First, run the development server:
+## 1) Roles and Access Rules (MVP)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Admin
+- Create and disable Teacher accounts (only Admin can do this)
+- Manage courses, schedules, users, and permissions
+- View attendance and basic analytics
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Teacher
+- Create courses and lessons (live sessions)
+- Schedule live classes
+- Post materials and announcements
+- Mark attendance (optional in MVP)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Student
+- Anyone can self-register
+- Join courses (open or invite-only)
+- Join live sessions
+- View recordings/materials (optional)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 2) Auth Setup: Enforce “Only Admin Can Create Teachers”
 
-## Learn More
+Use **NextAuth** (or Clerk) with a `role` column in the database.
 
-To learn more about Next.js, take a look at the following resources:
+### Signup Flow
+- Public `/sign-up` creates users with `role = STUDENT` by default.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Teacher Creation Flow
+- Admin-only page: `/admin/teachers/new`
+- Admin enters teacher email/name
+- System creates user record with `role = TEACHER`
+- Send invite email and password set link (or temporary password)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This keeps the rule strict: teachers cannot self-sign up as teachers.
 
-## Deploy on Vercel
+## 3) MVP Feature List (Optimized for Live Learning)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Must-have
+- Auth + roles (Admin / Teacher / Student)
+- Courses
+- Live session scheduling (date/time + join method)
+- Student enrollment (join course)
+- Live join page (one click)
+- Basic attendance (present/absent is enough)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Nice-to-have (Post-MVP)
+- Recordings + replay
+- Quizzes/assignments
+- Payments (if needed later)
+- Calendar sync + reminders (email/WhatsApp)
+
+## 4) Database Design (Simple and MVP-ready)
+
+Recommended stack: **PostgreSQL + Prisma**.
+
+### `User`
+- `id`
+- `name`
+- `email`
+- `role` (`ADMIN | TEACHER | STUDENT`)
+- `createdAt`
+
+### `Course`
+- `id`
+- `title`
+- `description`
+- `teacherId` (FK to `User`)
+- `status`
+
+### `Enrollment`
+- `id`
+- `courseId`
+- `studentId`
+- `createdAt`
+
+### `LiveSession`
+- `id`
+- `courseId`
+- `title`
+- `startsAt`
+- `endsAt`
+- `providerType` (`IN_APP | EXTERNAL_LINK`)
+- `joinUrl` (nullable)
+- `meetingId` / `providerMetadata` (nullable JSON)
+- `createdByTeacherId`
+
+### `Attendance`
+- `id`
+- `sessionId`
+- `studentId`
+- `status`
+- `joinedAt`
+
+## 5) Live Conferencing Options
+
+### Path A — Fastest MVP: External Platform Button
+Store and use a join URL for Zoom / Google Meet / Microsoft Teams.
+
+- Students click **Join Live Class** and open provider app/browser.
+- Pros: fastest and cheapest to launch, minimal engineering.
+- Cons: not fully in-app, limited custom analytics.
+
+### Path B — In-app Conferencing (Embedded)
+Embed video directly inside the LMS using a video SDK.
+
+Options:
+1. **Daily Video SDK** (fast integration, dev-friendly)
+2. **LiveKit** (high control and scalability, more engineering)
+3. **Zoom Meeting SDK** (embedded Zoom with JWT/signature flow)
+4. **Jitsi self-host** (open-source, but requires infra/reliability setup)
+
+## 6) Recommended Approach
+
+Start with **Path A (external links)** for MVP, then optionally move to Path B.
+
+### Why
+- Faster shipping
+- Lower complexity
+- Avoids early-stage video infrastructure overhead
+
+### Upgrade Path
+- MVP: external links + scheduling + attendance
+- V2: add Daily or LiveKit for in-app classes
+
+## 7) Join Live Button UX
+
+On each session page:
+- If `providerType = EXTERNAL_LINK` and `joinUrl` exists → show **Join Live Class** button.
+- If `providerType = IN_APP` → render embedded room UI.
+
+Recommended additions:
+- **Add to Calendar** (`.ics`)
+- **Copy Link**
+- **Countdown timer** (“Starts in X minutes”)
+
+## 8) Step-by-step Build Order
+
+1. Next.js + DB + Prisma
+2. Auth + roles + protected routes
+3. Admin panel: create teacher accounts
+4. Teacher panel: create courses + schedule sessions
+5. Student flow: register → enroll → session list
+6. Join button logic (external link MVP)
+7. Attendance (simple)
+8. Deployment (Vercel + managed Postgres)
+
+## 9) Suggested Course Categories (Teacher-facing)
+
+- Orientation / How Classes Work
+- Weekly Live Classes
+- Revision Sessions
+- Past Paper Discussions
+- Assignments & Feedback
+- Recorded Sessions (optional)
+
+Inside **Weekly Live Classes**, each lesson is represented as a `LiveSession`.
+
+## Open Product Decision
+
+Decide expected class size early:
+- **10–30 students per session**, or
+- **100+ students per session**
+
+This impacts hosting/provider choice, reliability setup, and whether breakout rooms are needed.
